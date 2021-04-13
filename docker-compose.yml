@@ -1,0 +1,77 @@
+version: '3'
+services:
+    postgres:
+        image: postgres:latest
+        container_name: teste-postgres
+        environment:
+            - POSTGRES_USER=airflow
+            - POSTGRES_PASSWORD=airflow
+            - POSTGRES_DB=airflow
+        ports: 
+            - 5432:5432
+        logging:
+            options:
+                max-size: 10m
+                max-file: "3"
+        networks: 
+            - postgres-airflow-network
+        env_file: 
+            - .env
+
+    pg_admin:
+        image: dpage/pgadmin4:latest
+        container_name: teste-pgadmin
+        ports:
+          - "15432:80"
+        environment:
+          - GUNICORN_THREADS=1
+          - PGADMIN_DEFAULT_EMAIL=airflow
+          - PGADMIN_DEFAULT_PASSWORD=airflow
+          - POSTGRES_DB=airflow
+        depends_on:
+          - postgres
+        networks: 
+            - postgres-airflow-network
+
+    webserver:
+        image: puckel/docker-airflow:latest
+        restart: always
+        container_name: teste-airflow
+        depends_on:
+            - postgres
+        environment:
+            - LOAD_EX=n
+            - EXECUTOR=Local
+#            - AIRFLOW_CONN_POSTGRES_MASTER=airflow://airflow:airflow@localhost:5432/airflow
+            - AIRFLOW_CONN_POSTGRES_MASTER=airflow://airflow:airflow@postgres:5432/airflow
+        logging:
+            options:
+                max-size: 10m
+                max-file: "3"
+        volumes:
+            - ./airflow/dags:/usr/local/airflow/dags
+            - ./airflow/functions:/usr/local/airflow/functions
+            - ./airflow/plugins:/usr/local/airflow/plugin
+        ports:
+            - "8080:8080"
+        command: webserver
+        networks: 
+            - postgres-airflow-network
+    
+    jupyter:
+        image: jupyter/scipy-notebook #docker-jupyter-extensible:latest
+        container_name: teste-jupyter
+        restart: 'no'
+        volumes:
+            - ./notebooks:/home/balthapaixao/notebooks
+        ports:
+            - "8888:8888"
+        environment:
+            NB_UID: ${UID}
+            NB_GID: ${GID}
+        networks: 
+            - postgres-airflow-network
+
+networks: 
+  postgres-airflow-network:
+    driver: bridge
